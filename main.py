@@ -47,9 +47,11 @@ class Camera:
 
     def get_frame(self) -> np.ndarray:
         if not self.running:
+            logger.error(f"Camera {self.camera_id} is not running")
             raise ValueError(f"Camera {self.camera_id} is not running. Please restart the camera.")
         with self.lock:
             if self.frame is None:
+                logger.error(f"Camera {self.camera_id} has no frame available")
                 raise ValueError(f"Camera {self.camera_id} has no frame available. Please restart the camera.")
             return self.frame.copy()
 
@@ -59,6 +61,7 @@ class Camera:
             self.thread.join(timeout=1)
         if self.cap is not None:
             self.cap.release()
+            logger.info(f"Camera {self.camera_id} released")
 
     def get_status(self) -> dict:
         with self.lock:
