@@ -14,7 +14,7 @@ Webカメラへの RESTful API アクセスを提供する Python サービス�
 
 - Python 3.7+
 - Webカメラ（USB カメラまたは仮想カメラ）
-- Linux環境での稼働を想定
+- Windows 10/11、Linux、macOS 対応
 
 ## インストール
 
@@ -38,7 +38,7 @@ Webカメラへの RESTful API アクセスを提供する Python サービス�
 3. 必要なパッケージをインストール:
 
    ```bash
-   pip install -r requirments.txt
+   pip install -r requirements.txt
    ```
 
 ## 使用方法
@@ -54,6 +54,22 @@ python main.py
 ### API ドキュメント
 
 ブラウザで `http://localhost:8000/docs` にアクセスすると、対話的な API ドキュメントを確認できます。
+
+## プロジェクト構造
+
+```text
+rest_cam/
+├── main.py                 # エントリーポイント（開発用）
+├── requirements.txt        # 依存パッケージリスト
+├── README.md              # このファイル
+├── LICENSE                # MITライセンス
+├── rest_cam/              # メインパッケージ
+│   ├── __init__.py
+│   ├── rest_api.py        # FastAPI アプリケーション定義
+│   ├── cam_ctl.py         # カメラ制御クラス
+│   └── img_edit.py        # 画像エンコーディング機能
+└── .venv/                 # Python仮想環境
+```
 
 ## API エンドポイント
 
@@ -108,6 +124,53 @@ GET /shutdown?execute=true
 GET /reboot?execute=true
 ```
 
+## 使用例
+
+### cURL を使用した例
+
+**画像取得:**
+
+```bash
+# PNG形式で画像を取得してファイルに保存
+curl "http://localhost:8000/get_image?cam_id=0&encoding=png" -o image.png
+
+# JPEG形式で画像を取得
+curl "http://localhost:8000/get_image?cam_id=0&encoding=jpg" -o image.jpg
+```
+
+**ステータス確認:**
+
+```bash
+# 全カメラのステータス取得
+curl "http://localhost:8000/status"
+
+# 特定のカメラのステータス取得
+curl "http://localhost:8000/status?cam_id=0"
+```
+
+### Python を使用した例
+
+```python
+import requests
+from PIL import Image
+import io
+
+# カメラから画像を取得
+response = requests.get("http://localhost:8000/get_image?cam_id=0&encoding=png")
+if response.status_code == 200:
+    # PILで画像を開く
+    image = Image.open(io.BytesIO(response.content))
+    image.show()
+    # ファイルに保存
+    image.save("captured_image.png")
+
+# ステータス取得
+status_response = requests.get("http://localhost:8000/status?cam_id=0")
+status = status_response.json()
+print(f"Camera resolution: {status['frame_width']}x{status['frame_height']}")
+print(f"FPS: {status['camera_fps']}")
+```
+
 ## アーキテクチャ
 
 - **Camera クラス**: 個別のカメラを管理（フレーム取得、状態管理）
@@ -117,16 +180,30 @@ GET /reboot?execute=true
 
 ## 開発
 
+### プロジェクト構成
+
+- `rest_cam/rest_api.py`: FastAPI アプリケーションとエンドポイント定義
+- `rest_cam/cam_ctl.py`: `Camera` クラスによるカメラ制御
+- `rest_cam/img_edit.py`: 画像エンコーディング機能
+- `main.py`: 開発用のエントリーポイント
+
 ### カメラの追加
 
-`main.py` の最下部でカメラを追加できます：
+`main.py` またはアプリケーション起動時にカメラを追加できます：
 
 ```python
-if __name__ == "__main__":
-    ACTIVE_CAMERAS = {
-        0: Camera(0),  # 1台目のカメラ
-        1: Camera(1),  # 2台目のカメラ
-    }
+from rest_cam.rest_api import ACTIVE_CAMERAS, app
+from rest_cam.cam_ctl import Camera
+
+# カメラを追加
+ACTIVE_CAMERAS.update({
+    0: Camera(0),  # 1台目のカメラ
+    1: Camera(1),  # 2台目のカメラ
+})
+
+# サーバー起動
+import uvicorn
+uvicorn.run(app, host="localhost", port=8000)
 ```
 
 ### ログ設定
@@ -140,6 +217,10 @@ if __name__ == "__main__":
 - カメラが他のアプリケーションで使用されていないか確認
 - USB接続を確認
 - カメラドライバーが正しくインストールされているか確認
+
+### システム制御について
+
+**注意**: シャットダウン・再起動機能は Linux 環境でのみ動作します。Windows 環境では管理者権限や代替コマンドが必要です。
 
 ### VCAMDS ログについて
 
