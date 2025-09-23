@@ -124,14 +124,15 @@ def reboot_event(execute: bool = False) -> fastapi.Response:
     return fastapi.Response(content="Reboot initiated", media_type="text/plain")
 
 
-def main(CAMERA_IDS: list[int] = [0]):
+def main(PORT: int = 8000, CAMERA_IDS: list[int] = [0]):
     """カメラを初期化してAPIサーバーを起動する
 
     Args:
+        PORT (int, optional): サーバーポート. Defaults to 8000.
         CAMERA_IDS (list[int], optional): 使用するカメラのIDリスト. Defaults to [0].
     """
 
     for cam_id in CAMERA_IDS:
         ACTIVE_CAMERAS[cam_id] = Camera(cam_id)
 
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="localhost", port=PORT)
