@@ -30,6 +30,8 @@ class Camera:
         self.running = True
         self.thread = Thread(target=self.capture_loop, daemon=True)
         self.thread.start()
+        logger.info(f"Camera {self.camera_id} initialized and capture thread started")
+        logger.debug(f"{self.get_status()}")
 
     def capture_loop(self) -> None:
         err_count = 0
@@ -162,6 +164,6 @@ def reboot_event(execute: bool = False) -> fastapi.Response:
 
 
 if __name__ == "__main__":
-    ACTIVE_CAMERAS = {0: Camera(0), 1: Camera(1)}
+    ACTIVE_CAMERAS = {0: Camera(0)}  # , 1: Camera(1)}
 
     uvicorn.run(app, host="localhost", port=8000)
