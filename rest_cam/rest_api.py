@@ -74,6 +74,49 @@ async def get_image(cam_id: int = 0, encoding: str = "png") -> fastapi.Response:
     return fastapi.Response(status_code=404, content="Camera not found")
 
 
+@app.get("/stream")
+async def stream_image(cam_id: int = 0, encoding: str = "jpg"):
+    """カメラからの画像ストリームを取得する
+
+    Args:
+        cam_id (int, optional): カメラID. Defaults to 0.
+        encoding (str, optional): エンコーディング形式. Defaults to "jpg".["jpg", "png", "bmp"] のいずれか
+
+    Returns:
+        fastapi.Response: ストリームデータを含むレスポンス
+    """
+    logger.info(f"Requesting stream from camera {cam_id} with encoding {encoding}")
+    if encoding not in ["png", "jpg", "bmp"]:
+        return fastapi.Response(status_code=400, content="Invalid encoding format")
+    if cam_id in ACTIVE_CAMERAS:
+        camera: Camera = ACTIVE_CAMERAS[cam_id]
+
+        async def frame_generator():
+            while True:
+                try:
+                    # フレーム取得を非同期実行
+                    image = await asyncio.to_thread(camera.get_frame)
+                    # 画像エンコーディングを非同期実行
+                    ret, buf = await asyncio.to_thread(encode_image, image, encoding)
+                    if not ret:
+                        logger.error(f"Encoding failed for camera {cam_id}. {encoding} is not supported.")
+                        break
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/" + encoding.encode() + b"\r\n\r\n" + buf.tobytes() + b"\r\n"
+                    )
+                    await asyncio.sleep(0.1)  # 適切なフレームレートに調整
+                except ValueError as e:
+                    logger.error(f"ValueError getting frame from camera {cam_id}: {e}")
+                    break
+                except Exception as e:
+                    logger.error(f"Unexpected error getting frame from camera {cam_id}: {e}")
+                    break
+
+        return fastapi.Response(content=frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return fastapi.Response(status_code=404, content="Camera not found")
+
+
 @app.get("/shutdown")
 async def shutdown_event(execute: bool = False) -> fastapi.Response:
     """システムシャットダウン
