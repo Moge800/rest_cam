@@ -65,7 +65,7 @@ async def get_image(cam_id: int = 0, encoding: str = "png") -> fastapi.Response:
             ret, buf = await asyncio.to_thread(encode_image, image, encoding)
             if not ret:
                 return fastapi.Response(status_code=500, content=f"Encoding failed. {encoding} is not supported.")
-            return fastapi.Response(content=buf.tobytes(), media_type=f"image/{encoding}")
+            return fastapi.responses.StreamingResponse(content=buf.tobytes(), media_type=f"image/{encoding}")
         except ValueError as e:
             return fastapi.Response(status_code=500, content=str(e))
         except Exception as e:
