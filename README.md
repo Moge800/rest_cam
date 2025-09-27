@@ -5,14 +5,18 @@ Webカメラへの RESTful API アクセスを提供する Python サービス�
 ## 機能
 
 - **カメラ画像取得**: PNG、JPG、BMP形式での画像取得
+- **リアルタイムストリーミング**: Motion-JPEGストリームでの連続画像配信
 - **カメラステータス**: カメラの状態、解像度、FPS などの情報取得
+- **非同期処理**: async/await による高性能な並行処理
 - **リアルタイム処理**: バックグラウンドでの連続フレーム取得
 - **システム制御**: シャットダウン・再起動機能
 - **Web UI**: FastAPI の自動生成ドキュメント
 
 ## 必要な環境
 
-- Python 3.7+
+## 必要な環境
+
+- Python 3.8+（非同期処理機能のため）
 - Webカメラ（USB カメラまたは仮想カメラ）
 - Windows 10/11、Linux、macOS 対応
 
@@ -41,6 +45,12 @@ Webカメラへの RESTful API アクセスを提供する Python サービス�
    pip install -r requirements.txt
    ```
 
+   **オプション**: 非同期クライアント例を試す場合は追加パッケージをインストール:
+
+   ```bash
+   pip install aiohttp pillow
+   ```
+
 ## 使用方法
 
 ### サーバー起動
@@ -49,7 +59,7 @@ Webカメラへの RESTful API アクセスを提供する Python サービス�
 python main.py
 ```
 
-サーバーは `http://localhost:8000` で起動します。
+サーバーは `http://0.0.0.0:8000` で起動し、ローカルネットワーク内からアクセス可能です。
 
 ### API ドキュメント
 
@@ -85,6 +95,19 @@ GET /get_image?cam_id=0&encoding=png
 - `encoding` (str): 画像フォーマット（png, jpg, bmp）
 
 **レスポンス:** 画像データ（バイナリ）
+
+### リアルタイムストリーミング
+
+```http
+GET /stream?cam_id=0&encoding=jpg
+```
+
+**パラメータ:**
+
+- `cam_id` (int): カメラID（デフォルト: 0）
+- `encoding` (str): 画像フォーマット（jpg, png, bmp）
+
+**レスポンス:** Motion-JPEG ストリーム（multipart/x-mixed-replace）
 
 ### ステータス取得
 
@@ -136,6 +159,9 @@ curl "http://localhost:8000/get_image?cam_id=0&encoding=png" -o image.png
 
 # JPEG形式で画像を取得
 curl "http://localhost:8000/get_image?cam_id=0&encoding=jpg" -o image.jpg
+
+# ストリームを確認（数秒後にCtrl+Cで停止）
+curl "http://localhost:8000/stream?cam_id=0&encoding=jpg"
 ```
 
 **ステータス確認:**
@@ -149,6 +175,8 @@ curl "http://localhost:8000/status?cam_id=0"
 ```
 
 ### Python を使用した例
+
+**基本的な使用例:**
 
 ```python
 import requests
@@ -171,12 +199,54 @@ print(f"Camera resolution: {status['frame_width']}x{status['frame_height']}")
 print(f"FPS: {status['camera_fps']}")
 ```
 
+**非同期クライアントの例:**
+
+```python
+import aiohttp
+import asyncio
+from PIL import Image
+import io
+
+async def get_image_async():
+    async with aiohttp.ClientSession() as session:
+        async with session.get("http://localhost:8000/get_image?cam_id=0&encoding=png") as response:
+            if response.status == 200:
+                image_data = await response.read()
+                image = Image.open(io.BytesIO(image_data))
+                return image
+    return None
+
+# 使用例
+image = asyncio.run(get_image_async())
+if image:
+    image.save("async_captured_image.png")
+```
+
+**ストリーミング表示の例（HTML/JavaScript）:**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Stream</title>
+</head>
+<body>
+    <h1>Live Camera Stream</h1>
+    <img src="http://localhost:8000/stream?cam_id=0&encoding=jpg" 
+         alt="Live Stream" 
+         style="max-width: 100%; height: auto;">
+</body>
+</html>
+```
+
 ## アーキテクチャ
 
+- **非同期処理**: async/await による高性能なI/O処理
 - **Camera クラス**: 個別のカメラを管理（フレーム取得、状態管理）
 - **バックグラウンドスレッド**: 連続的なフレーム取得
 - **スレッドセーフ**: Lock を使用した安全なフレームアクセス
-- **エラーハンドリング**: カメラアクセスエラーの自動復旧
+- **並行処理**: asyncio.gather() による複数カメラの並行ステータス取得
+- **エラーハンドリング**: 詳細なエラーログとグレースフルな例外処理
 
 ## 開発
 
@@ -222,19 +292,15 @@ uvicorn.run(app, host="localhost", port=8000)
 
 **注意**: シャットダウン・再起動機能は Linux 環境でのみ動作します。Windows 環境では管理者権限や代替コマンドが必要です。
 
-### VCAMDS ログについて
-
-ログに表示される `[VCAMDS]` は仮想カメラ（Virtual Camera DirectShow）からの出力です。OBS Studio や ManyCam などの仮想カメラソフトウェアが動作している場合に表示されます。
-
 ### パフォーマンス
 
+- **非同期処理の利点**: 複数の同時リクエストを効率的に処理可能
+- **並行処理**: 複数カメラのステータス取得を並行実行
+- **ストリーミング最適化**: フレームレート調整（デフォルト10fps）でCPU負荷を制御
+- **メモリ効率**: イベントループベースでスレッド数を削減
 - 高解像度での連続取得はCPU使用率が高くなる場合があります
 - 必要に応じて画像サイズやフレームレートを調整してください
 
 ## ライセンス
 
 このプロジェクトは MIT ライセンスの下で公開されています。
-
-## 貢献
-
-バグ報告や機能改善の提案は、GitHub の Issues でお願いします。
