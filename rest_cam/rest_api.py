@@ -212,4 +212,4 @@ def main(PORT: int = 8000, CAMERA_IDS: list[int] = [0]):
     for cam_id in CAMERA_IDS:
         ACTIVE_CAMERAS[cam_id] = Camera(cam_id)
 
-    uvicorn.run(app, host="localhost", port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
